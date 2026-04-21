@@ -1,0 +1,35 @@
+appId: com.r2mp4.app
+productName: React to MP4
+copyright: Copyright © 2026
+
+directories:
+  buildResources: build
+  output: dist-electron
+
+files:
+  - out/**/*
+  - node_modules/**/*
+  - "!node_modules/ffmpeg-static/bin/linux/**"
+  - "!node_modules/ffmpeg-static/bin/mac/**"
+  - "!node_modules/.cache/**"
+
+extraResources:
+  - from: "node_modules/ffmpeg-static/bin/win32/x64/ffmpeg.exe"
+    to: "ffmpeg/ffmpeg.exe"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+publish: null
