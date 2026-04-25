@@ -6,6 +6,12 @@ import { buildAndServe, BuildResult } from './builder'
 import { captureFrames } from './capturer'
 import { encodeToMp4 } from './encoder'
 import { ConversionQueue } from './queue'
+import {
+  isRemotionProject,
+  installDeps,
+  listRemotionCompositions,
+  renderRemotionToMp4,
+} from './remotion'
 
 const queue = new ConversionQueue()
 let currentBuildResult: BuildResult | null = null
@@ -22,6 +28,43 @@ async function runConversion(
     win.webContents.send('convert:progress', { phase, message, percent })
   }
 
+  // Remotion projects: render directly via Remotion CLI (skips capture & encode)
+  if (isRemotionProject(job.inputPath)) {
+    sendProgress('building', 'Proyecto Remotion detectado. Instalando dependencias...', 0)
+    await installDeps(job.inputPath, (msg) => sendProgress('building', msg, 5))
+    onProgress(10)
+
+    if (cancelRequested) throw new Error('Cancelled')
+
+    sendProgress('building', 'Listando composiciones...', 10)
+    const compositions = await listRemotionCompositions(job.inputPath)
+    if (compositions.length === 0) {
+      throw new Error('No se encontraron composiciones en el proyecto Remotion.')
+    }
+
+    const { id: compositionId, entryPoint } = compositions[0]
+    const outputMp4 = path.join(job.outputPath, job.options.outputName)
+
+    sendProgress('rendering', `Composición: "${compositionId}". Iniciando render...`, 15)
+    onProgress(15)
+
+    await renderRemotionToMp4(
+      job.inputPath,
+      compositionId,
+      entryPoint,
+      outputMp4,
+      (msg, pct) => {
+        const total = 15 + Math.round(pct * 0.85)
+        onProgress(total)
+        sendProgress('rendering', msg, total)
+      }
+    )
+
+    onProgress(100)
+    return
+  }
+
+  // Standard path: build → serve → capture → encode
   sendProgress('building', 'Running npm install & build...', 0)
   const buildResult = await buildAndServe(job.inputPath, (msg) => {
     sendProgress('building', msg, 10)
@@ -94,7 +137,9 @@ export function registerIpcHandlers(win: BrowserWindow): void {
         await runConversion(job, (p) => { job.progress = p }, win)
         win.webContents.send('convert:done')
       } catch (err) {
-        win.webContents.send('convert:done', err instanceof Error ? err.message : String(err))
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error('[convert:start] error:', msg)
+        win.webContents.send('convert:done', msg)
       }
     }
   )

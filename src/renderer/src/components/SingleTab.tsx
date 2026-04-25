@@ -82,11 +82,13 @@ export function SingleTab(): React.ReactElement {
       )}
 
       {status === 'error' && (
-        <div className="flex items-center justify-between bg-red-900/40 border border-red-700 rounded px-4 py-3 text-sm text-red-300">
-          <span className="truncate">{errorMsg || 'Error desconocido'}</span>
-          <button onClick={reset} className="text-xs underline hover:text-red-200 ml-2 shrink-0">
-            Reintentar
-          </button>
+        <div className="bg-red-900/40 border border-red-700 rounded px-4 py-3 text-sm text-red-300">
+          <div className="flex items-start justify-between gap-2">
+            <pre className="whitespace-pre-wrap break-all font-sans leading-relaxed flex-1">{errorMsg || 'Error desconocido'}</pre>
+            <button onClick={reset} className="text-xs underline hover:text-red-200 shrink-0 mt-0.5">
+              Reintentar
+            </button>
+          </div>
         </div>
       )}
 

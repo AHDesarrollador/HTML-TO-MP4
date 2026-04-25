@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash *)",
+      "Bash(explorer.exe \"C:\\\\Users\\\\ariel\\\\OneDrive\\\\Documentos\\\\app html a  mp4\\\\docs\\\\superpowers\\\\specs\")",
+      "Bash(npm install *)",
+      "Bash(FFMPEG_SKIP_DOWNLOAD=true npm install)",
+      "Read(//mnt/c/Users/ariel/OneDrive/Documentos/app html a mp4/node_modules/**)",
+      "Read(//mnt/c/Users/ariel/OneDrive/Documentos/app html a mp4/node_modules/ffmpeg-static/**)",
+      "Bash(chmod -R u+w \"/mnt/c/Users/ariel/OneDrive/Documentos/app html a  mp4/node_modules/\")",
+      "Bash(node node_modules/electron/install.js)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git -c user.email=ariel.hc8@outloo.com -c user.name=Ariel commit -m ' *)",
+      "Bash(git *)",
+      "Bash(npm list *)",
+      "Bash(npx tsc *)",
+      "Bash(npm test *)",
+      "Bash(node *)",
+      "Bash(where ffmpeg *)"
+    ]
+  }
+}
