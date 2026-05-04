@@ -65,6 +65,14 @@ export async function captureFrames(options: CaptureOptions): Promise<CaptureRes
 
     const client: CDPSession = await page.createCDPSession()
 
+    // Detect WebGL once — presence does not change between frames
+    const hasWebGL = await page.evaluate(() => {
+      const canvases = Array.from(document.querySelectorAll('canvas'))
+      return canvases.some(
+        (c) => c.getContext('webgl') !== null || c.getContext('webgl2') !== null
+      )
+    })
+
     // Freeze virtual time at t=0: pauses Date.now(), performance.now(),
     // CSS animations/transitions, rAF, setTimeout/setInterval
     await client.send('Emulation.setVirtualTimePolicy', {
@@ -89,7 +97,7 @@ export async function captureFrames(options: CaptureOptions): Promise<CaptureRes
 
       await expired
 
-      const buf = await captureFrame(page, width, height)
+      const buf = await captureFrame(page, width, height, hasWebGL)
       const framePath = path.join(framesDir, `frame-${String(i).padStart(6, '0')}.png`)
       fs.writeFileSync(framePath, buf)
       onProgress(i + 1, totalFrames)
@@ -104,14 +112,7 @@ export async function captureFrames(options: CaptureOptions): Promise<CaptureRes
   }
 }
 
-async function captureFrame(page: Page, width: number, height: number): Promise<Buffer> {
-  const hasWebGL = await page.evaluate(() => {
-    const canvases = Array.from(document.querySelectorAll('canvas'))
-    return canvases.some(
-      (c) => c.getContext('webgl') !== null || c.getContext('webgl2') !== null
-    )
-  })
-
+async function captureFrame(page: Page, width: number, height: number, hasWebGL: boolean): Promise<Buffer> {
   if (hasWebGL) {
     const dataUrl = await page.evaluate((w: number, h: number) => {
       const out = document.createElement('canvas')
