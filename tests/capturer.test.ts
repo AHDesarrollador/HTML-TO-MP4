@@ -3,28 +3,52 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as fs from 'fs'
 
 // ── Mock puppeteer BEFORE importing capturer ──────────────────────────────────
-const mockSend = vi.fn().mockResolvedValue(undefined)
-const mockOnce = vi.fn().mockImplementation((_event: string, cb: () => void) => {
-  setTimeout(cb, 0)
-})
-const mockCdpSession = { send: mockSend, once: mockOnce }
+const {
+  mockSend,
+  mockOnce,
+  mockCdpSession,
+  mockEvaluate,
+  mockScreenshot,
+  mockPage,
+  mockClose,
+  mockBrowser,
+  mockLaunch,
+} = vi.hoisted(() => {
+  const mockSend = vi.fn().mockResolvedValue(undefined)
+  const mockOnce = vi.fn().mockImplementation((_event: string, cb: () => void) => {
+    setTimeout(cb, 0)
+  })
+  const mockCdpSession = { send: mockSend, once: mockOnce }
 
-const mockEvaluate = vi.fn().mockResolvedValue(false)
-const mockScreenshot = vi.fn().mockResolvedValue(Buffer.alloc(8))
-const mockPage = {
-  setViewport: vi.fn().mockResolvedValue(undefined),
-  evaluateOnNewDocument: vi.fn().mockResolvedValue(undefined),
-  goto: vi.fn().mockResolvedValue(undefined),
-  createCDPSession: vi.fn().mockResolvedValue(mockCdpSession),
-  screenshot: mockScreenshot,
-  evaluate: mockEvaluate,
-}
-const mockClose = vi.fn().mockResolvedValue(undefined)
-const mockBrowser = {
-  newPage: vi.fn().mockResolvedValue(mockPage),
-  close: mockClose,
-}
-const mockLaunch = vi.fn().mockResolvedValue(mockBrowser)
+  const mockEvaluate = vi.fn().mockResolvedValue(false)
+  const mockScreenshot = vi.fn().mockResolvedValue(Buffer.alloc(8))
+  const mockPage = {
+    setViewport: vi.fn().mockResolvedValue(undefined),
+    evaluateOnNewDocument: vi.fn().mockResolvedValue(undefined),
+    goto: vi.fn().mockResolvedValue(undefined),
+    createCDPSession: vi.fn().mockResolvedValue(mockCdpSession),
+    screenshot: mockScreenshot,
+    evaluate: mockEvaluate,
+  }
+  const mockClose = vi.fn().mockResolvedValue(undefined)
+  const mockBrowser = {
+    newPage: vi.fn().mockResolvedValue(mockPage),
+    close: mockClose,
+  }
+  const mockLaunch = vi.fn().mockResolvedValue(mockBrowser)
+
+  return {
+    mockSend,
+    mockOnce,
+    mockCdpSession,
+    mockEvaluate,
+    mockScreenshot,
+    mockPage,
+    mockClose,
+    mockBrowser,
+    mockLaunch,
+  }
+})
 
 vi.mock('puppeteer', () => ({ default: { launch: mockLaunch } }))
 
