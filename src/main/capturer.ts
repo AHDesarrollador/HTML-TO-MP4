@@ -79,7 +79,6 @@ export async function captureFrames(options: CaptureOptions): Promise<CaptureRes
       policy: 'pauseIfNetworkFetchesPending',
       budget: 0,
       maxVirtualTimeTaskStarvationCount: 0,
-      waitForNavigation: false,
     })
 
     for (let i = 0; i < totalFrames; i++) {
@@ -92,7 +91,6 @@ export async function captureFrames(options: CaptureOptions): Promise<CaptureRes
         policy: 'advance',
         budget: frameInterval,
         maxVirtualTimeTaskStarvationCount: 0,
-        waitForNavigation: false,
       })
 
       await expired

@@ -19,7 +19,13 @@
       "Bash(node *)",
       "Bash(where ffmpeg *)",
       "Bash(gh --version)",
-      "Skill(update-config)"
+      "Skill(update-config)",
+      "Bash(cat vite.config.ts)",
+      "Bash(cat vitest.config.ts)",
+      "Bash(cat vite.config.mts)",
+      "Read(//mnt/c/Users/ariel/OneDrive/Documentos/**)",
+      "Bash(python3 -c \"import json; pkg=json.load\\(open\\('package.json'\\)\\); print\\('puppeteer:', pkg.get\\('dependencies',{}\\).get\\('puppeteer','NOT FOUND'\\)\\)\")",
+      "Bash(npm run *)"
     ]
   }
 }
