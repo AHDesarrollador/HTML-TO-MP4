@@ -1,5 +1,5 @@
 // tests/capturer.test.ts
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as fs from 'fs'
 
 // ── Mock puppeteer BEFORE importing capturer ──────────────────────────────────
@@ -52,6 +52,15 @@ describe('captureFrames', () => {
     mockPage.createCDPSession.mockResolvedValue(mockCdpSession)
   })
 
+  let lastResult: { framesDir: string } | undefined
+
+  afterEach(() => {
+    if (lastResult) {
+      fs.rmSync(lastResult.framesDir, { recursive: true, force: true })
+      lastResult = undefined
+    }
+  })
+
   it('returns frameCount matching fps * duration', async () => {
     const result = await captureFrames(BASE)
     expect(result.frameCount).toBe(2)
@@ -91,7 +100,8 @@ describe('captureFrames', () => {
   })
 
   it('advances virtual time once per frame', async () => {
-    await captureFrames({ ...BASE, fps: 3, duration: 1 })
+    const result = await captureFrames({ ...BASE, fps: 3, duration: 1 })
+    lastResult = result
     const advanceCalls = mockSend.mock.calls.filter(
       ([cmd, p]) => cmd === 'Emulation.setVirtualTimePolicy' && p?.policy === 'advance'
     )
@@ -99,7 +109,8 @@ describe('captureFrames', () => {
   })
 
   it('advance budget equals 1000/fps ms', async () => {
-    await captureFrames({ ...BASE, fps: 4, duration: 1 })
+    const result = await captureFrames({ ...BASE, fps: 4, duration: 1 })
+    lastResult = result
     const advance = mockSend.mock.calls.find(
       ([cmd, p]) => cmd === 'Emulation.setVirtualTimePolicy' && p?.policy === 'advance'
     )
@@ -108,18 +119,20 @@ describe('captureFrames', () => {
 
   it('calls onProgress for each frame', async () => {
     const onProgress = vi.fn()
-    await captureFrames({ ...BASE, fps: 3, duration: 1, onProgress })
+    const result = await captureFrames({ ...BASE, fps: 3, duration: 1, onProgress })
+    lastResult = result
     expect(onProgress).toHaveBeenCalledTimes(3)
     expect(onProgress).toHaveBeenNthCalledWith(1, 1, 3)
     expect(onProgress).toHaveBeenNthCalledWith(3, 3, 3)
   })
 
   it('closes browser after successful capture', async () => {
-    await captureFrames(BASE)
+    const result = await captureFrames(BASE)
+    lastResult = result
     expect(mockClose).toHaveBeenCalledOnce()
   })
 
-  it('closes browser and removes framesDir on error', async () => {
+  it('closes browser on error', async () => {
     mockPage.goto.mockRejectedValueOnce(new Error('load failed'))
     await expect(captureFrames(BASE)).rejects.toThrow('load failed')
     expect(mockClose).toHaveBeenCalledOnce()
@@ -139,7 +152,8 @@ describe('captureFrames', () => {
 
   it('falls back to page.screenshot when no WebGL canvas', async () => {
     mockEvaluate.mockResolvedValue(false)
-    await captureFrames({ ...BASE, fps: 1, duration: 1 })
+    const result = await captureFrames({ ...BASE, fps: 1, duration: 1 })
+    lastResult = result
     expect(mockScreenshot).toHaveBeenCalledOnce()
   })
 })
