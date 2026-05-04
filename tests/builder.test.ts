@@ -114,6 +114,19 @@ describe('buildAndServe', () => {
     await expect(buildAndServe(tmpDir, vi.fn())).rejects.toThrow('out/')
     fs.rmSync(tmpDir, { recursive: true })
   })
+
+  it('restores original next.config.js even when build throws', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-next-'))
+    const pkg = { dependencies: { next: '^14.0.0' }, scripts: { build: 'next build' } }
+    fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify(pkg))
+    const originalConfig = "module.exports = { reactStrictMode: true }\n"
+    fs.writeFileSync(path.join(tmpDir, 'next.config.js'), originalConfig)
+    // No out/ created — build "succeeds" but out/ won't exist → throws
+    mockSpawnSuccess()
+    await expect(buildAndServe(tmpDir, vi.fn())).rejects.toThrow('out/')
+    expect(fs.readFileSync(path.join(tmpDir, 'next.config.js'), 'utf-8')).toBe(originalConfig)
+    fs.rmSync(tmpDir, { recursive: true })
+  })
 })
 
 // ── isNextJsProject ───────────────────────────────────────────────────────────

@@ -22,6 +22,7 @@ export async function buildAndServe(
     if (!fs.existsSync(path.join(projectPath, 'index.html'))) {
       throw new Error(`No index.html or package.json found in ${projectPath}`)
     }
+    // No package.json — serve static files directly
     onProgress('Serving static files...')
     return serveDir(projectPath)
   }
@@ -35,6 +36,7 @@ export async function buildAndServe(
 
   const hasBuildScript = !!(pkg.scripts && pkg.scripts.build)
 
+  // Has package.json but no build script — serve existing dist/ or project root
   if (!hasBuildScript) {
     const distPath = path.join(projectPath, 'dist')
     const servePath = fs.existsSync(distPath) ? distPath : projectPath
@@ -42,6 +44,7 @@ export async function buildAndServe(
     return serveDir(servePath)
   }
 
+  // Has build script — install, build, then serve dist/
   onProgress('Running npm install...')
   await runCommand('npm', ['install'], projectPath)
 
@@ -101,7 +104,15 @@ async function buildNextJs(
 
   if (!alreadyExported) {
     if (configPath && original !== null) {
-      fs.writeFileSync(configPath, patchNextConfigContent(original), 'utf-8')
+      const patched = patchNextConfigContent(original)
+      if (patched === original) {
+        onProgress(
+          `Warning: could not auto-patch ${path.basename(configPath)} ` +
+            `(variable-style export not supported). ` +
+            `If the build fails, add output: 'export' manually.`
+        )
+      }
+      fs.writeFileSync(configPath, patched, 'utf-8')
     } else {
       fs.writeFileSync(
         path.join(projectPath, 'next.config.js'),
