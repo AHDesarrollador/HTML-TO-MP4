@@ -25,7 +25,13 @@
       "Bash(cat vite.config.mts)",
       "Read(//mnt/c/Users/ariel/OneDrive/Documentos/**)",
       "Bash(python3 -c \"import json; pkg=json.load\\(open\\('package.json'\\)\\); print\\('puppeteer:', pkg.get\\('dependencies',{}\\).get\\('puppeteer','NOT FOUND'\\)\\)\")",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "WebFetch(domain:api.anthropic.com)",
+      "Bash(cp \"/home/higgs/.claude/projects/-mnt-c-Users-ariel-OneDrive-Documentos-app-html-a--mp4/da2369ca-e02c-4003-8d29-8059fdf950fd/tool-results/webfetch-1777926942019-3b5h8v.bin\" /tmp/rendercast.gz)",
+      "Bash(gunzip -f /tmp/rendercast.gz)",
+      "Read(//tmp/**)",
+      "Bash(mkdir -p rendercast_bundle)",
+      "Bash(tar -xf /tmp/rendercast -C /tmp/rendercast_bundle)"
     ]
   }
 }

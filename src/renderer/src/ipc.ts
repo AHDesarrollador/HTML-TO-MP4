@@ -2,6 +2,9 @@ import type { ConversionOptions, ConversionJob, ProgressData } from '../../main/
 
 const api = (window as any).api as {
   selectFolder: () => Promise<string | null>
+  listFolder: (folderPath: string) => Promise<Array<{ name: string; isDir: boolean; size?: number }>>
+  openUrl: (url: string) => Promise<void>
+  openFolder: (folderPath: string) => Promise<void>
   convertStart: (i: string, o: string, opts: ConversionOptions) => Promise<void>
   convertCancel: () => void
   onConvertProgress: (cb: (d: ProgressData) => void) => () => void

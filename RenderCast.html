@@ -1,0 +1,1632 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RenderCast — React/HTML → MP4</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+/* ====================================================
+   RenderCast — interfaz oscura, terminal, acento lima
+   ==================================================== */
+:root {
+  --bg: #0c0f0d;
+  --bg-1: #0f1311;
+  --bg-2: #131815;
+  --bg-3: #1a201d;
+  --bg-4: #222a26;
+  --line: #1e2622;
+  --line-2: #2a332d;
+  --text: #cdd6cf;
+  --text-dim: #7a857d;
+  --text-mute: #4a534c;
+  --accent: #c4f542;
+  --accent-dim: #8eb52c;
+  --accent-glow: rgba(196, 245, 66, 0.18);
+  --warn: #f5c542;
+  --bad: #f56c42;
+  --ok: #6cf542;
+  --mono: "JetBrains Mono", "Fira Code", "Menlo", monospace;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.4;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+button { font-family: inherit; font-size: inherit; cursor: pointer; }
+.mono { font-family: var(--mono); }
+
+/* App shell */
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(circle at 80% -10%, rgba(196,245,66,0.06), transparent 50%),
+    radial-gradient(circle at -10% 110%, rgba(196,245,66,0.03), transparent 50%),
+    var(--bg);
+}
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ============ TOP MENU ============ */
+.topmenu {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--line);
+  padding: 0 8px;
+  position: relative;
+  z-index: 100;
+  user-select: none;
+}
+.topmenu-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px 0 4px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  border-right: 1px solid var(--line);
+  margin-right: 6px;
+  height: 100%;
+}
+.brand-dot {
+  width: 8px; height: 8px; border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+.topmenu-item {
+  padding: 0 12px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  color: var(--text-dim);
+  cursor: pointer;
+  position: relative;
+  transition: color 0.1s, background 0.1s;
+}
+.topmenu-item:hover, .topmenu-item.active {
+  color: var(--text);
+  background: var(--bg-2);
+}
+.topmenu-dropdown {
+  position: absolute;
+  top: 100%;
+  left: -1px;
+  min-width: 240px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  padding: 4px 0;
+  z-index: 200;
+}
+.dd-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 14px;
+  gap: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+.dd-item:hover { background: var(--accent); color: #0c0f0d; }
+.dd-item:hover .dd-shortcut { color: rgba(0,0,0,0.55); }
+.dd-shortcut {
+  margin-left: auto;
+  color: var(--text-mute);
+  font-size: 11px;
+}
+.dd-check { width: 14px; color: var(--accent); }
+.dd-item:hover .dd-check { color: #0c0f0d; }
+.dd-divider { height: 1px; background: var(--line); margin: 4px 0; }
+.topmenu-spacer { flex: 1; }
+.topmenu-status {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px;
+  color: var(--text-mute);
+  padding-right: 6px;
+}
+.status-sep { opacity: 0.5; }
+.status-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text-mute);
+  display: inline-block;
+}
+.status-dot.ok {
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+
+/* ============ SIDEBAR ============ */
+.sidebar {
+  width: 320px;
+  flex-shrink: 0;
+  background: var(--bg-1);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  overflow-y: auto;
+}
+.sidebar::-webkit-scrollbar { width: 6px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--bg-4); border-radius: 3px; }
+.panel {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--line);
+}
+.panel-tree { flex-shrink: 0; max-height: 200px; overflow: hidden; }
+.panel-config { flex-shrink: 0; }
+.panel-head {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px 8px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--text-mute);
+  flex-shrink: 0;
+}
+.panel-title { flex: 1; }
+.panel-actions { display: flex; gap: 4px; align-items: center; }
+.ph-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-mute);
+  width: 20px; height: 20px;
+  border-radius: 3px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px;
+}
+.ph-btn:hover { background: var(--bg-3); color: var(--text); }
+
+/* Active file pill */
+.active-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px 10px;
+  padding: 8px 10px;
+  background: var(--bg-3);
+  border: 1px solid var(--line-2);
+  border-left: 2px solid var(--accent);
+  color: var(--accent);
+  font-size: 12px;
+}
+.active-file-name { flex: 1; }
+.active-file-status { color: var(--accent); font-size: 8px; }
+
+.file-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; height: 16px;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+  flex-shrink: 0;
+}
+.ext-jsx { color: var(--accent); }
+.ext-html { color: #f5a542; }
+.ext-js { color: #f5d742; }
+
+/* Drop zone */
+.dropzone {
+  margin: 0 12px 12px;
+  border: 1px dashed var(--line-2);
+  background: var(--bg-2);
+  padding: 14px 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.dropzone:hover { border-color: var(--accent-dim); }
+.dropzone.over {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+.dropzone-plus {
+  font-size: 14px;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.dropzone-text { font-size: 11px; color: var(--text); }
+.dropzone-hint { font-size: 10px; color: var(--text-mute); margin-top: 2px; }
+
+/* Tree */
+.tree {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 8px;
+}
+.tree::-webkit-scrollbar { width: 8px; }
+.tree::-webkit-scrollbar-thumb { background: var(--bg-4); border-radius: 4px; }
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.tree-row:hover { background: var(--bg-2); }
+.tree-folder { color: var(--text-dim); }
+.tree-caret {
+  display: inline-block;
+  width: 10px;
+  font-size: 9px;
+  color: var(--text-mute);
+}
+.tree-folder-icon {
+  color: var(--text-mute);
+  font-size: 11px;
+}
+.tree-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.tree-size { color: var(--text-mute); font-size: 10px; }
+.tree-file.active {
+  background: var(--bg-3);
+  color: var(--accent);
+  border-right: 2px solid var(--accent);
+}
+
+/* ============ QUEUE ============ */
+.panel-queue {
+  flex-shrink: 0;
+}
+.queue-badge {
+  background: var(--bg-3);
+  border: 1px solid var(--line-2);
+  color: var(--accent);
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  letter-spacing: 0.04em;
+}
+.queue {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.queue-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 0 12px 8px;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+}
+.qs-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0;
+  border-right: 1px solid var(--line);
+}
+.qs-item:last-child { border-right: none; }
+.qs-num {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.1;
+}
+.qs-num.accent { color: var(--accent); }
+.qs-lbl {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-mute);
+  margin-top: 2px;
+}
+.queue-list {
+  margin: 0 12px;
+  overflow-y: auto;
+  max-height: 160px;
+}
+.queue-list::-webkit-scrollbar { width: 6px; }
+.queue-list::-webkit-scrollbar-thumb { background: var(--bg-4); border-radius: 3px; }
+.q-row {
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  margin-bottom: 4px;
+  padding: 6px 8px;
+  transition: border-color 0.15s;
+}
+.q-row.rendering { border-color: var(--accent-dim); border-left: 2px solid var(--accent); }
+.q-row.done { opacity: 0.65; }
+.q-row:hover { background: var(--bg-3); }
+.q-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.q-info { flex: 1; min-width: 0; }
+.q-name {
+  font-size: 11px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.q-meta {
+  font-size: 9px;
+  color: var(--text-mute);
+  letter-spacing: 0.04em;
+  margin-top: 1px;
+}
+.q-status {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.q-status.done { color: var(--accent); border-color: var(--accent-dim); }
+.q-status.rendering { color: var(--accent); border-color: var(--accent); background: var(--accent-glow); }
+.q-status.queued { color: var(--text-mute); }
+.q-status.error { color: var(--bad); border-color: var(--bad); }
+.q-x {
+  background: transparent;
+  border: none;
+  color: var(--text-mute);
+  font-size: 10px;
+  padding: 2px 4px;
+}
+.q-x:hover { color: var(--bad); }
+.q-bar {
+  height: 2px;
+  background: var(--bg-3);
+  margin-top: 6px;
+  overflow: hidden;
+}
+.q-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s linear;
+}
+.queue-actions {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px 12px;
+}
+.q-act-btn {
+  flex: 1;
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  color: var(--text-dim);
+  padding: 5px 0;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  border-radius: 2px;
+}
+.q-act-btn:hover { background: var(--bg-3); color: var(--accent); border-color: var(--accent-dim); }
+
+/* ============ CONFIG ============ */
+.config { padding: 4px 14px 14px; }
+.cfg-row {
+  display: grid;
+  grid-template-columns: 70px 1fr 60px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.cfg-row label {
+  color: var(--text-mute);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.cfg-readout {
+  text-align: right;
+  font-size: 11px;
+  color: var(--accent);
+}
+
+/* Segmented buttons */
+.seg {
+  display: flex;
+  border: 1px solid var(--line-2);
+  background: var(--bg-2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.seg-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  padding: 5px 0;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  border-right: 1px solid var(--line-2);
+  transition: all 0.1s;
+}
+.seg-btn:last-child { border-right: none; }
+.seg-btn:hover { color: var(--text); background: var(--bg-3); }
+.seg-btn.active {
+  background: var(--accent);
+  color: #0c0f0d;
+  font-weight: 600;
+}
+
+/* Range slider */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  height: 22px;
+  border-radius: 2px;
+  outline: none;
+  padding: 0 4px;
+  width: 100%;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 4px; height: 14px;
+  background: var(--accent);
+  border-radius: 1px;
+  cursor: ew-resize;
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+.slider::-moz-range-thumb {
+  width: 4px; height: 14px;
+  background: var(--accent);
+  border: none; border-radius: 1px;
+  cursor: ew-resize;
+}
+
+/* Format switch */
+.format-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  padding: 3px;
+  border-radius: 2px;
+}
+.fs-opt {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-mute);
+  padding: 3px 0;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  transition: color 0.15s;
+}
+.fs-opt.active { color: var(--accent); font-weight: 600; }
+.fs-track {
+  width: 24px;
+  height: 14px;
+  background: var(--bg-3);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.fs-knob {
+  position: absolute;
+  top: 1px;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+  transition: left 0.18s cubic-bezier(.5,1.5,.5,1);
+}
+.fs-track.left .fs-knob { left: 1px; }
+.fs-track.right .fs-knob { left: 12px; }
+
+/* Estimaciones */
+.cfg-est {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+  font-size: 11px;
+}
+.est-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  color: var(--text-mute);
+}
+.est-row span:last-child { color: var(--text); }
+
+/* ============ MAIN ============ */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg);
+  position: relative;
+}
+.main-toolbar {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--line);
+  padding-right: 10px;
+}
+.tab-strip {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+}
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-right: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+  position: relative;
+}
+.tab.active {
+  color: var(--text);
+  background: var(--bg);
+}
+.tab.active::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: var(--accent);
+}
+.tab-x {
+  color: var(--text-mute);
+  font-size: 14px;
+  width: 14px;
+  text-align: center;
+  border-radius: 2px;
+}
+.tab-x:hover { background: var(--bg-3); color: var(--text); }
+.tab-add {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px;
+  color: var(--text-mute);
+  cursor: pointer;
+  border-right: 1px solid var(--line);
+}
+.tab-add:hover { color: var(--accent); }
+.main-tools {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+.tool-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-dim);
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 2px;
+}
+.tool-btn:hover { background: var(--bg-2); color: var(--text); border-color: var(--line-2); }
+
+/* Preview */
+.preview {
+  flex: 1;
+  margin: 16px;
+  background: #050605;
+  border: 1px solid var(--line-2);
+  position: relative;
+  overflow: hidden;
+  min-height: 200px;
+}
+.preview-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(196,245,66,0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(196,245,66,0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+.preview-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.preview-hud {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.hud-tag {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--text-mute);
+  padding: 3px 8px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid var(--line);
+}
+
+/* Timeline */
+.timeline {
+  margin: 0 16px 12px;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  padding: 8px 12px 12px;
+}
+.tl-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.tl-btn {
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  color: var(--text);
+  width: 28px; height: 24px;
+  border-radius: 2px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px;
+}
+.tl-btn:hover { background: var(--bg-3); }
+.tl-btn.primary {
+  background: var(--accent);
+  color: #0c0f0d;
+  border-color: var(--accent);
+  width: 36px;
+}
+.tl-btn.primary:hover { background: #d8ff5e; }
+.tl-time {
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.tl-track {
+  position: relative;
+  height: 36px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  cursor: pointer;
+}
+.tl-fill {
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  background: linear-gradient(180deg, rgba(196,245,66,0.12), rgba(196,245,66,0.04));
+  border-right: 1px solid var(--accent);
+}
+.tl-playhead {
+  position: absolute;
+  top: -3px; bottom: -3px;
+  width: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+  transform: translateX(-1px);
+  pointer-events: none;
+}
+.tl-ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.tl-tick {
+  position: absolute;
+  top: 0; bottom: 0;
+  border-left: 1px solid var(--line-2);
+  font-size: 9px;
+  color: var(--text-mute);
+  padding: 2px 0 0 3px;
+}
+
+/* Export button */
+.export-btn {
+  margin: 0 16px 16px;
+  height: 56px;
+  background: var(--accent);
+  color: #0c0f0d;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s;
+  box-shadow: 0 4px 24px var(--accent-glow);
+}
+.export-btn:hover {
+  background: #d8ff5e;
+  box-shadow: 0 6px 32px rgba(196, 245, 66, 0.35);
+  transform: translateY(-1px);
+}
+.export-icon {
+  background: #0c0f0d;
+  color: var(--accent);
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  font-size: 12px;
+}
+.export-meta {
+  position: absolute;
+  right: 18px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  opacity: 0.65;
+}
+
+/* Statusbar */
+.statusbar {
+  height: 22px;
+  background: var(--bg-1);
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--text-mute);
+}
+.statusbar .sep { opacity: 0.4; }
+.statusbar .sb-spacer { flex: 1; }
+
+/* Modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 6, 5, 0.75);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fade 0.15s ease-out;
+}
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.modal {
+  width: 480px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-2);
+  box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  animation: slide 0.2s ease-out;
+}
+@keyframes slide { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+.modal-x {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--text-mute);
+  font-size: 12px;
+}
+.modal-x:hover { color: var(--text); }
+.modal-body { padding: 18px 18px 16px; }
+.modal-stage {
+  font-size: 12px;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+.modal-stage::after {
+  content: "";
+  display: inline-block;
+  width: 6px; height: 12px;
+  background: var(--accent);
+  vertical-align: -2px;
+  margin-left: 4px;
+  animation: blink 1s steps(2) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+.modal-bar {
+  height: 6px;
+  background: var(--bg-3);
+  border: 1px solid var(--line-2);
+  border-radius: 1px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.modal-fill {
+  height: 100%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+  transition: width 0.15s linear;
+}
+.modal-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 18px;
+  font-size: 11px;
+}
+.modal-meta > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--line);
+  color: var(--text-mute);
+}
+.modal-meta > div span:last-child { color: var(--text); }
+.modal-done {
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.btn-secondary, .btn-primary {
+  padding: 7px 16px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--line-2);
+  background: var(--bg-2);
+  color: var(--text);
+}
+.btn-primary {
+  background: var(--accent);
+  color: #0c0f0d;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.btn-primary:hover { background: #d8ff5e; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+// ============================================================
+// MENU SUPERIOR
+// ============================================================
+function TopMenu({ onAction }) {
+  const [open, setOpen] = useState(null);
+  const menus = {
+    Archivo: [
+      { label: "Nuevo proyecto", shortcut: "Ctrl+N" },
+      { label: "Abrir archivo...", shortcut: "Ctrl+O" },
+      { label: "Abrir carpeta", shortcut: "Ctrl+K" },
+      { label: "Archivos recientes", shortcut: "" },
+      { divider: true },
+      { label: "Guardar configuración", shortcut: "Ctrl+S" },
+      { label: "Salir", shortcut: "Alt+F4" },
+    ],
+    Editar: [
+      { label: "Deshacer", shortcut: "Ctrl+Z" },
+      { label: "Rehacer", shortcut: "Ctrl+Y" },
+      { divider: true },
+      { label: "Preferencias", shortcut: "Ctrl+," },
+      { label: "Atajos de teclado", shortcut: "" },
+    ],
+    Vista: [
+      { label: "Pantalla completa", shortcut: "F11" },
+      { label: "Mostrar línea de tiempo", shortcut: "" },
+      { label: "Mostrar consola", shortcut: "Ctrl+`" },
+      { divider: true },
+      { label: "Tema oscuro", check: true },
+      { label: "Cuadrícula de referencia", check: false },
+    ],
+    Exportar: [
+      { label: "Exportar ahora", shortcut: "Ctrl+E" },
+      { label: "Exportar como secuencia", shortcut: "" },
+      { label: "Exportar GIF", shortcut: "" },
+      { divider: true },
+      { label: "Cola de renderizado", shortcut: "" },
+    ],
+    Ayuda: [
+      { label: "Documentación", shortcut: "F1" },
+      { label: "Atajos", shortcut: "" },
+      { label: "Reportar problema", shortcut: "" },
+      { divider: true },
+      { label: "Acerca de RenderCast", shortcut: "" },
+    ],
+  };
+
+  return (
+    <div className="topmenu" onMouseLeave={() => setOpen(null)}>
+      <div className="topmenu-brand">
+        <span className="brand-dot" />
+        rendercast
+      </div>
+      {Object.keys(menus).map((name) => (
+        <div
+          key={name}
+          className={`topmenu-item ${open === name ? "active" : ""}`}
+          onMouseEnter={() => open && setOpen(name)}
+          onClick={() => setOpen(open === name ? null : name)}
+        >
+          {name}
+          {open === name && (
+            <div className="topmenu-dropdown">
+              {menus[name].map((it, i) =>
+                it.divider ? (
+                  <div key={i} className="dd-divider" />
+                ) : (
+                  <div key={i} className="dd-item" onClick={() => { onAction?.(it.label); setOpen(null); }}>
+                    <span>{it.label}</span>
+                    {it.check !== undefined && (
+                      <span className="dd-check">{it.check ? "✓" : ""}</span>
+                    )}
+                    {it.shortcut && <span className="dd-shortcut">{it.shortcut}</span>}
+                  </div>
+                )
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+      <div className="topmenu-spacer" />
+      <div className="topmenu-status">
+        <span className="status-dot ok" />
+        ffmpeg listo
+        <span className="status-sep">·</span>
+        v1.4.2
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// EXPLORADOR DE ARCHIVOS
+// ============================================================
+const FILE_TREE = [
+  {
+    name: "Documentos",
+    type: "folder",
+    children: [
+      { name: "intro.jsx", type: "file", ext: "jsx", size: "2.4 KB" },
+      { name: "loader.html", type: "file", ext: "html", size: "1.1 KB" },
+    ],
+  },
+  {
+    name: "Proyectos",
+    type: "folder",
+    open: true,
+    children: [
+      {
+        name: "landing-hero",
+        type: "folder",
+        open: true,
+        children: [
+          { name: "animation.jsx", type: "file", ext: "jsx", size: "4.8 KB", active: true },
+          { name: "particles.jsx", type: "file", ext: "jsx", size: "3.2 KB" },
+          { name: "logo-reveal.html", type: "file", ext: "html", size: "1.9 KB" },
+        ],
+      },
+      {
+        name: "ad-spots",
+        type: "folder",
+        children: [
+          { name: "spot-15s.jsx", type: "file", ext: "jsx", size: "6.0 KB" },
+          { name: "spot-30s.jsx", type: "file", ext: "jsx", size: "8.2 KB" },
+        ],
+      },
+    ],
+  },
+  {
+    name: "Escritorio",
+    type: "folder",
+    children: [
+      { name: "test.html", type: "file", ext: "html", size: "0.9 KB" },
+    ],
+  },
+];
+
+function FileIcon({ ext }) {
+  const map = { jsx: "{ }", html: "</>", js: "JS" };
+  return <span className={`file-icon ext-${ext}`}>{map[ext] || "·"}</span>;
+}
+
+function FileTree({ activeFile, setActiveFile }) {
+  const [tree, setTree] = useState(FILE_TREE);
+
+  const toggle = (path) => {
+    const clone = JSON.parse(JSON.stringify(tree));
+    let node = { children: clone };
+    path.forEach((idx) => { node = node.children[idx]; });
+    node.open = !node.open;
+    setTree(clone);
+  };
+
+  const renderNode = (node, path, depth) => {
+    if (node.type === "folder") {
+      return (
+        <div key={path.join("-")}>
+          <div
+            className="tree-row tree-folder"
+            style={{ paddingLeft: 8 + depth * 14 }}
+            onClick={() => toggle(path)}
+          >
+            <span className="tree-caret">{node.open ? "▾" : "▸"}</span>
+            <span className="tree-folder-icon">{node.open ? "▤" : "▥"}</span>
+            <span className="tree-name">{node.name}</span>
+          </div>
+          {node.open &&
+            node.children?.map((c, i) => renderNode(c, [...path, "children", i], depth + 1))}
+        </div>
+      );
+    }
+    const isActive = activeFile === node.name;
+    return (
+      <div
+        key={path.join("-")}
+        className={`tree-row tree-file ${isActive ? "active" : ""}`}
+        style={{ paddingLeft: 8 + depth * 14 }}
+        onClick={() => setActiveFile(node.name)}
+      >
+        <FileIcon ext={node.ext} />
+        <span className="tree-name">{node.name}</span>
+        <span className="tree-size">{node.size}</span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="tree">
+      {tree.map((n, i) => renderNode(n, [i], 0))}
+    </div>
+  );
+}
+
+// ============================================================
+// DRAG & DROP ZONE
+// ============================================================
+function DropZone({ onDrop }) {
+  const [over, setOver] = useState(false);
+  return (
+    <div
+      className={`dropzone ${over ? "over" : ""}`}
+      onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setOver(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file) onDrop(file.name);
+      }}
+    >
+      <div className="dropzone-plus">[ + ]</div>
+      <div className="dropzone-text">arrastra .jsx · .html · .js</div>
+      <div className="dropzone-hint">o haz clic para seleccionar</div>
+    </div>
+  );
+}
+
+// ============================================================
+// COLA DE PROYECTOS
+// ============================================================
+function QueueStatus({ status, progress }) {
+  if (status === "done") return <span className="q-status done">✓ listo</span>;
+  if (status === "rendering") return <span className="q-status rendering">⟳ {progress}%</span>;
+  if (status === "error") return <span className="q-status error">! error</span>;
+  return <span className="q-status queued">en espera</span>;
+}
+
+function ProjectQueue({ queue, setQueue }) {
+  const remove = (id) => setQueue(queue.filter((q) => q.id !== id));
+
+  return (
+    <div className="queue">
+      <div className="queue-summary">
+        <div className="qs-item">
+          <span className="qs-num">{queue.length}</span>
+          <span className="qs-lbl">total</span>
+        </div>
+        <div className="qs-item">
+          <span className="qs-num accent">{queue.filter((q) => q.status === "rendering").length}</span>
+          <span className="qs-lbl">activo</span>
+        </div>
+        <div className="qs-item">
+          <span className="qs-num">{queue.filter((q) => q.status === "queued").length}</span>
+          <span className="qs-lbl">en cola</span>
+        </div>
+        <div className="qs-item">
+          <span className="qs-num">{queue.filter((q) => q.status === "done").length}</span>
+          <span className="qs-lbl">listo</span>
+        </div>
+      </div>
+      <div className="queue-list">
+        {queue.map((q) => (
+          <div key={q.id} className={`q-row ${q.status}`}>
+            <div className="q-main">
+              <FileIcon ext={q.name.split(".").pop()} />
+              <div className="q-info">
+                <div className="q-name">{q.name}</div>
+                <div className="q-meta">{q.format} · {q.res} · {q.duration.toFixed(1)}s</div>
+              </div>
+              <QueueStatus status={q.status} progress={q.progress} />
+              <button className="q-x" onClick={() => remove(q.id)} title="Quitar">✕</button>
+            </div>
+            {q.status === "rendering" && (
+              <div className="q-bar">
+                <div className="q-bar-fill" style={{ width: q.progress + "%" }} />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="queue-actions">
+        <button className="q-act-btn">+ añadir</button>
+        <button className="q-act-btn">▶ procesar todo</button>
+        <button className="q-act-btn">⌫ limpiar</button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// CONFIGURACIÓN
+// ============================================================
+function Config({ config, setConfig }) {
+  const FPS = [24, 30, 60];
+
+  return (
+    <div className="config">
+      <div className="cfg-row">
+        <label>Resolución</label>
+        <div className="seg">
+          <button className="seg-btn active">1080p</button>
+        </div>
+        <div className="cfg-readout">1920 × 1080</div>
+      </div>
+
+      <div className="cfg-row">
+        <label>FPS</label>
+        <div className="seg">
+          {FPS.map((f) => (
+            <button
+              key={f}
+              className={`seg-btn ${config.fps === f ? "active" : ""}`}
+              onClick={() => setConfig({ ...config, fps: f })}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+        <div className="cfg-readout">{config.fps} fps</div>
+      </div>
+
+      <div className="cfg-row">
+        <label>Duración</label>
+        <input
+          type="range"
+          min="1"
+          max="60"
+          step="0.5"
+          value={config.duration}
+          onChange={(e) => setConfig({ ...config, duration: parseFloat(e.target.value) })}
+          className="slider"
+        />
+        <div className="cfg-readout">{config.duration.toFixed(1)} s</div>
+      </div>
+
+      <div className="cfg-row">
+        <label>Formato</label>
+        <div className="format-switch">
+          <button
+            className={`fs-opt ${config.format === "MP4" ? "active" : ""}`}
+            onClick={() => setConfig({ ...config, format: "MP4" })}
+          >
+            MP4
+          </button>
+          <div
+            className={`fs-track ${config.format === "MP4" ? "left" : "right"}`}
+            onClick={() => setConfig({ ...config, format: config.format === "MP4" ? "H.264" : "MP4" })}
+          >
+            <div className="fs-knob" />
+          </div>
+          <button
+            className={`fs-opt ${config.format === "H.264" ? "active" : ""}`}
+            onClick={() => setConfig({ ...config, format: "H.264" })}
+          >
+            H.264
+          </button>
+        </div>
+        <div className="cfg-readout">.{config.format === "MP4" ? "mp4" : "264"}</div>
+      </div>
+
+      <div className="cfg-est">
+        <div className="est-row">
+          <span>Frames</span>
+          <span>{Math.round(config.fps * config.duration)}</span>
+        </div>
+        <div className="est-row">
+          <span>Tamaño aprox.</span>
+          <span>{Math.round((1920 * 1080 * config.fps * config.duration) / 1_000_000 / 8)} MB</span>
+        </div>
+        <div className="est-row">
+          <span>Bitrate</span>
+          <span>12 Mbps</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// PREVIEW (animación con GSAP)
+// ============================================================
+function Preview({ playing, duration, fps, currentTime, setCurrentTime }) {
+  const orbitARef = useRef(null);
+  const orbitBRef = useRef(null);
+  const coreRef = useRef(null);
+  const tlRef = useRef(null);
+
+  useEffect(() => {
+    const tl = gsap.timeline({ paused: true, repeat: -1 });
+    tl.to(orbitARef.current, { rotation: 360, duration: 4, ease: "none", transformOrigin: "50% 50%" }, 0);
+    tl.to(orbitBRef.current, { rotation: -360, duration: 6, ease: "none", transformOrigin: "50% 50%" }, 0);
+    tl.fromTo(
+      coreRef.current,
+      { scale: 0.85 },
+      { scale: 1.15, duration: 1, ease: "sine.inOut", yoyo: true, repeat: -1 },
+      0
+    );
+    tlRef.current = tl;
+    return () => tl.kill();
+  }, []);
+
+  useEffect(() => {
+    if (!tlRef.current) return;
+    if (playing) tlRef.current.play();
+    else tlRef.current.pause();
+  }, [playing]);
+
+  useEffect(() => {
+    if (!tlRef.current) return;
+    tlRef.current.time(currentTime % 6);
+  }, [currentTime]);
+
+  return (
+    <div className="preview">
+      <div className="preview-grid" />
+      <svg viewBox="0 0 600 360" className="preview-svg">
+        <g ref={orbitBRef} style={{ transformOrigin: "300px 180px" }}>
+          <circle cx="300" cy="180" r="130" fill="none" stroke="#c4f542" strokeOpacity="0.18" strokeDasharray="2 6" />
+          <circle cx="300" cy="50" r="6" fill="#c4f542" />
+        </g>
+        <g ref={orbitARef} style={{ transformOrigin: "300px 180px" }}>
+          <circle cx="300" cy="180" r="80" fill="none" stroke="#c4f542" strokeOpacity="0.35" strokeDasharray="3 5" />
+          <circle cx="380" cy="180" r="5" fill="#c4f542" />
+        </g>
+        <circle
+          ref={coreRef}
+          cx="300" cy="180" r="14"
+          fill="#c4f542"
+          style={{ transformOrigin: "300px 180px", filter: "drop-shadow(0 0 10px #c4f54299)" }}
+        />
+      </svg>
+      <div className="preview-hud">
+        <div className="hud-tag">PREVIEW · 16:9</div>
+        <div className="hud-tag mono">
+          {currentTime.toFixed(2).padStart(5, "0")} / {duration.toFixed(2)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// TIMELINE
+// ============================================================
+function Timeline({ playing, setPlaying, currentTime, setCurrentTime, duration, fps }) {
+  useEffect(() => {
+    if (!playing) return;
+    let raf;
+    let last = performance.now();
+    const tick = (now) => {
+      const dt = (now - last) / 1000;
+      last = now;
+      setCurrentTime((t) => {
+        const n = t + dt;
+        return n > duration ? 0 : n;
+      });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, duration, setCurrentTime]);
+
+  const pct = (currentTime / duration) * 100;
+  const ticks = Math.floor(duration) + 1;
+
+  return (
+    <div className="timeline">
+      <div className="tl-controls">
+        <button className="tl-btn" onClick={() => setCurrentTime(0)}>⏮</button>
+        <button className="tl-btn primary" onClick={() => setPlaying(!playing)}>
+          {playing ? "⏸" : "▶"}
+        </button>
+        <button className="tl-btn" onClick={() => setCurrentTime(duration)}>⏭</button>
+        <div className="tl-time mono">
+          {currentTime.toFixed(2)}s / {duration.toFixed(2)}s
+        </div>
+      </div>
+      <div
+        className="tl-track"
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          const x = (e.clientX - r.left) / r.width;
+          setCurrentTime(x * duration);
+        }}
+      >
+        <div className="tl-fill" style={{ width: pct + "%" }} />
+        <div className="tl-playhead" style={{ left: pct + "%" }} />
+        <div className="tl-ticks">
+          {Array.from({ length: ticks }).map((_, i) => (
+            <div key={i} className="tl-tick" style={{ left: (i / Math.max(ticks - 1, 1)) * 100 + "%" }}>
+              <span>{i}s</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// EXPORT BUTTON + MODAL
+// ============================================================
+function ExportButton({ config, onExport }) {
+  return (
+    <button className="export-btn" onClick={onExport}>
+      <span className="export-icon">▶</span>
+      <span>EXPORTAR {config.format}</span>
+      <span className="export-meta mono">
+        1080p · {config.fps}fps · {config.duration.toFixed(1)}s
+      </span>
+    </button>
+  );
+}
+
+function ExportProgress({ open, onClose, config }) {
+  const [progress, setProgress] = useState(0);
+  const [stage, setStage] = useState("inicializando ffmpeg");
+  const totalFrames = Math.round(config.fps * config.duration);
+  const currentFrame = Math.round((progress / 100) * totalFrames);
+
+  useEffect(() => {
+    if (!open) {
+      setProgress(0);
+      setStage("inicializando ffmpeg");
+      return;
+    }
+    const stages = [
+      [10, "leyendo escena"],
+      [25, "compilando jsx"],
+      [40, "renderizando frames"],
+      [70, "renderizando frames"],
+      [90, "codificando " + config.format],
+      [100, "finalizado"],
+    ];
+    const id = setInterval(() => {
+      setProgress((p) => {
+        const next = Math.min(p + 1.5, 100);
+        const s = stages.find(([t]) => next <= t);
+        if (s) setStage(s[1]);
+        return next;
+      });
+    }, 60);
+    return () => clearInterval(id);
+  }, [open, config.format, config.fps, config.duration]);
+
+  if (!open) return null;
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <span className="brand-dot" />
+          exportando · {config.format}
+          <button className="modal-x" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <div className="modal-stage mono">{stage}...</div>
+          <div className="modal-bar">
+            <div className="modal-fill" style={{ width: progress + "%" }} />
+          </div>
+          <div className="modal-meta">
+            <div><span>frame</span><span className="mono">{currentFrame} / {totalFrames}</span></div>
+            <div><span>progreso</span><span className="mono">{progress.toFixed(0)}%</span></div>
+            <div><span>resolución</span><span className="mono">1920×1080</span></div>
+            <div><span>destino</span><span className="mono">~/Videos/render.{config.format === "MP4" ? "mp4" : "264"}</span></div>
+          </div>
+          {progress >= 100 && (
+            <div className="modal-done">
+              <button className="btn-secondary" onClick={onClose}>Cerrar</button>
+              <button className="btn-primary">Abrir carpeta</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// APP
+// ============================================================
+function App() {
+  const [activeFile, setActiveFile] = useState("animation.jsx");
+  const [config, setConfig] = useState({
+    res: "1080p",
+    w: 1920,
+    h: 1080,
+    fps: 60,
+    duration: 4.0,
+    format: "MP4",
+  });
+  const [playing, setPlaying] = useState(true);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const [queue, setQueue] = useState([
+    { id: 1, name: "logo-reveal.html", format: "MP4",   res: "1080p", duration: 3.0,  status: "done",      progress: 100 },
+    { id: 2, name: "particles.jsx",    format: "H.264", res: "1080p", duration: 6.5,  status: "rendering", progress: 64  },
+    { id: 3, name: "spot-15s.jsx",     format: "MP4",   res: "1080p", duration: 15.0, status: "queued",    progress: 0   },
+    { id: 4, name: "intro.jsx",        format: "MP4",   res: "1080p", duration: 4.0,  status: "queued",    progress: 0   },
+  ]);
+
+  // Animate rendering item progress
+  useEffect(() => {
+    const id = setInterval(() => {
+      setQueue((qs) =>
+        qs.map((q) => {
+          if (q.status !== "rendering") return q;
+          const next = q.progress + 0.5;
+          if (next >= 100) return { ...q, progress: 100, status: "done" };
+          return { ...q, progress: next };
+        })
+      );
+    }, 400);
+    return () => clearInterval(id);
+  }, []);
+
+  // GSAP entrance
+  useEffect(() => {
+    gsap.from(".topmenu", { y: -20, opacity: 0, duration: 0.5, ease: "power2.out" });
+    gsap.from(".sidebar", { x: -30, opacity: 0, duration: 0.6, ease: "power2.out", delay: 0.1 });
+    gsap.from(".main", { opacity: 0, duration: 0.6, ease: "power2.out", delay: 0.2 });
+  }, []);
+
+  return (
+    <div className="app">
+      <TopMenu onAction={(a) => a === "Exportar ahora" && setExporting(true)} />
+
+      <div className="body">
+        <aside className="sidebar">
+          <section className="panel">
+            <div className="panel-head">
+              <span className="panel-title">ARCHIVO DE ENTRADA</span>
+              <span className="panel-actions">
+                <button className="ph-btn" title="Abrir">⊕</button>
+                <button className="ph-btn" title="Refrescar">↻</button>
+              </span>
+            </div>
+            <div className="active-file">
+              <FileIcon ext="jsx" />
+              <span className="active-file-name">{activeFile}</span>
+              <span className="active-file-status">●</span>
+            </div>
+            <DropZone onDrop={(name) => setActiveFile(name)} />
+          </section>
+
+          <section className="panel panel-tree">
+            <div className="panel-head">
+              <span className="panel-title">EXPLORADOR</span>
+              <span className="panel-actions">
+                <button className="ph-btn">▤</button>
+              </span>
+            </div>
+            <FileTree activeFile={activeFile} setActiveFile={setActiveFile} />
+          </section>
+
+          <section className="panel panel-queue">
+            <div className="panel-head">
+              <span className="panel-title">COLA DE PROYECTOS</span>
+              <span className="panel-actions">
+                <span className="queue-badge">{queue.length}</span>
+              </span>
+            </div>
+            <ProjectQueue queue={queue} setQueue={setQueue} />
+          </section>
+
+          <section className="panel panel-config">
+            <div className="panel-head">
+              <span className="panel-title">CONFIGURACIÓN</span>
+            </div>
+            <Config config={config} setConfig={setConfig} />
+          </section>
+        </aside>
+
+        <main className="main">
+          <div className="main-toolbar">
+            <div className="tab-strip">
+              <div className="tab active">
+                <FileIcon ext="jsx" />
+                {activeFile}
+                <span className="tab-x">×</span>
+              </div>
+              <div className="tab-add">+</div>
+            </div>
+            <div className="main-tools">
+              <button className="tool-btn">↺ recargar</button>
+              <button className="tool-btn">⊞ cuadrícula</button>
+              <button className="tool-btn">◐ fondo</button>
+            </div>
+          </div>
+
+          <Preview
+            playing={playing}
+            duration={config.duration}
+            fps={config.fps}
+            currentTime={currentTime}
+            setCurrentTime={setCurrentTime}
+          />
+
+          <Timeline
+            playing={playing}
+            setPlaying={setPlaying}
+            currentTime={currentTime}
+            setCurrentTime={setCurrentTime}
+            duration={config.duration}
+            fps={config.fps}
+          />
+
+          <ExportButton config={config} onExport={() => setExporting(true)} />
+        </main>
+      </div>
+
+      <div className="statusbar">
+        <span><span className="status-dot ok" />conectado</span>
+        <span className="sep">·</span>
+        <span>react 18.3 · gsap 3.12</span>
+        <span className="sep">·</span>
+        <span>{activeFile}</span>
+        <div className="sb-spacer" />
+        <span>memoria 142 MB</span>
+        <span className="sep">·</span>
+        <span>cpu 8%</span>
+        <span className="sep">·</span>
+        <span>1920×1080 @ {config.fps}fps</span>
+      </div>
+
+      <ExportProgress open={exporting} onClose={() => setExporting(false)} config={config} />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

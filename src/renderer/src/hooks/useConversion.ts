@@ -5,7 +5,7 @@ import { ipc } from '../ipc'
 type Status = 'idle' | 'running' | 'done' | 'error'
 
 export function useConversion() {
-  const [options, setOptions] = useState<ConversionOptions>(DEFAULT_OPTIONS)
+  const [options, setOptions] = useState<ConversionOptions>({ ...DEFAULT_OPTIONS, fps: 24 })
   const [inputPath, setInputPath] = useState<string>('')
   const [outputPath, setOutputPath] = useState<string>('')
   const [status, setStatus] = useState<Status>('idle')

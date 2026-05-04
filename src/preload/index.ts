@@ -7,6 +7,15 @@ contextBridge.exposeInMainWorld('api', {
   selectFolder: (): Promise<string | null> =>
     ipcRenderer.invoke('dialog:selectFolder'),
 
+  listFolder: (folderPath: string): Promise<Array<{ name: string; isDir: boolean; size?: number }>> =>
+    ipcRenderer.invoke('folder:list', folderPath),
+
+  openUrl: (url: string): Promise<void> =>
+    ipcRenderer.invoke('shell:openUrl', url),
+
+  openFolder: (folderPath: string): Promise<void> =>
+    ipcRenderer.invoke('shell:openFolder', folderPath),
+
   // Conversión single
   convertStart: (
     inputPath: string,

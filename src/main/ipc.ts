@@ -1,5 +1,5 @@
 // src/main/ipc.ts
-import { ipcMain, dialog, BrowserWindow } from 'electron'
+import { ipcMain, dialog, shell, BrowserWindow } from 'electron'
 import * as path from 'path'
 import { ConversionJob, ConversionOptions } from './types'
 import { buildAndServe, BuildResult } from './builder'
@@ -112,6 +112,8 @@ async function runConversion(
   }
 }
 
+const SKIP_DIRS = new Set(['node_modules', '.git', '.next', 'dist', 'build', 'out', '.cache', 'coverage'])
+
 export function registerIpcHandlers(win: BrowserWindow): void {
   // Dialogs
   ipcMain.handle('dialog:selectFolder', async () => {
@@ -119,6 +121,41 @@ export function registerIpcHandlers(win: BrowserWindow): void {
       properties: ['openDirectory'],
     })
     return result.canceled ? null : result.filePaths[0]
+  })
+
+  // Open external URL in default browser
+  ipcMain.handle('shell:openUrl', (_event, url: string) => shell.openExternal(url))
+
+  // Open a local folder in the system file explorer
+  ipcMain.handle('shell:openFolder', (_event, folderPath: string) => shell.openPath(folderPath))
+
+  // List folder contents (one level, filtered)
+  ipcMain.handle('folder:list', async (_event, folderPath: string) => {
+    const fs = await import('fs/promises')
+    const stat = await import('fs/promises')
+    try {
+      const entries = await fs.readdir(folderPath, { withFileTypes: true })
+      const result: Array<{ name: string; isDir: boolean; size?: number }> = []
+      for (const entry of entries) {
+        if (entry.name.startsWith('.') && entry.name !== '.env') continue
+        if (entry.isDirectory() && SKIP_DIRS.has(entry.name)) continue
+        let size: number | undefined
+        if (!entry.isDirectory()) {
+          try {
+            const s = await stat.stat(path.join(folderPath, entry.name))
+            size = s.size
+          } catch { /* ignore */ }
+        }
+        result.push({ name: entry.name, isDir: entry.isDirectory(), size })
+      }
+      result.sort((a, b) => {
+        if (a.isDir !== b.isDir) return a.isDir ? -1 : 1
+        return a.name.localeCompare(b.name)
+      })
+      return result
+    } catch {
+      return []
+    }
   })
 
   // Single conversion
