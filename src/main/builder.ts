@@ -18,7 +18,6 @@ export async function buildAndServe(
 ): Promise<BuildResult> {
   const pkgPath = path.join(projectPath, 'package.json')
 
-  // No package.json — serve static files directly
   if (!fs.existsSync(pkgPath)) {
     if (!fs.existsSync(path.join(projectPath, 'index.html'))) {
       throw new Error(`No index.html or package.json found in ${projectPath}`)
@@ -28,9 +27,14 @@ export async function buildAndServe(
   }
 
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
+
+  // Next.js: must be detected before generic build logic
+  if (isNextJsProject(pkg)) {
+    return buildNextJs(projectPath, pkg, onProgress)
+  }
+
   const hasBuildScript = !!(pkg.scripts && pkg.scripts.build)
 
-  // Has package.json but no build script — serve existing dist/ or project root
   if (!hasBuildScript) {
     const distPath = path.join(projectPath, 'dist')
     const servePath = fs.existsSync(distPath) ? distPath : projectPath
@@ -38,7 +42,6 @@ export async function buildAndServe(
     return serveDir(servePath)
   }
 
-  // Has build script — install, build, then serve dist/
   onProgress('Running npm install...')
   await runCommand('npm', ['install'], projectPath)
 
@@ -46,8 +49,6 @@ export async function buildAndServe(
   try {
     await runCommand('npm', ['run', 'build'], projectPath)
   } catch (buildErr) {
-    // npm run build failed — if vite is available, retry with vite build directly
-    // (skips tsc type errors, which are irrelevant for rendering)
     const hasViteConfig = ['vite.config.ts', 'vite.config.js', 'vite.config.mts', 'vite.config.mjs'].some(
       (f) => fs.existsSync(path.join(projectPath, f))
     )
@@ -63,6 +64,97 @@ export async function buildAndServe(
 
   onProgress('Serving built files...')
   return serveDir(distPath)
+}
+
+export function isNextJsProject(pkg: Record<string, unknown>): boolean {
+  const deps = {
+    ...((pkg.dependencies as Record<string, string>) ?? {}),
+    ...((pkg.devDependencies as Record<string, string>) ?? {}),
+  }
+  return 'next' in deps
+}
+
+export function patchNextConfigContent(content: string): string {
+  // Return unchanged if output: 'export' is already present
+  if (content.includes("output: 'export'") || content.includes('output: "export"')) {
+    return content
+  }
+  // Insert after opening brace of module.exports = { or export default {
+  return content.replace(
+    /(module\.exports\s*=\s*\{|export\s+default\s+(?:defineConfig\s*\()?\s*\{)/,
+    `$1\n  output: 'export',`
+  )
+}
+
+async function buildNextJs(
+  projectPath: string,
+  pkg: Record<string, unknown>,
+  onProgress: (msg: string) => void
+): Promise<BuildResult> {
+  onProgress('Next.js project detected. Running npm install...')
+  await runCommand('npm', ['install'], projectPath)
+
+  const { configPath, original } = readNextConfig(projectPath)
+  const alreadyExported =
+    original !== null &&
+    (original.includes("output: 'export'") || original.includes('output: "export"'))
+
+  if (!alreadyExported) {
+    if (configPath && original !== null) {
+      fs.writeFileSync(configPath, patchNextConfigContent(original), 'utf-8')
+    } else {
+      fs.writeFileSync(
+        path.join(projectPath, 'next.config.js'),
+        "module.exports = { output: 'export' }\n",
+        'utf-8'
+      )
+    }
+  }
+
+  try {
+    onProgress('Building Next.js project...')
+    const hasBuildScript = !!(
+      pkg.scripts && (pkg.scripts as Record<string, string>).build
+    )
+    if (hasBuildScript) {
+      await runCommand('npm', ['run', 'build'], projectPath)
+    } else {
+      await runCommand('npx', ['next', 'build'], projectPath)
+    }
+
+    const outPath = path.join(projectPath, 'out')
+    if (!fs.existsSync(outPath)) {
+      throw new Error(
+        `Next.js build succeeded but no out/ directory found in ${projectPath}. ` +
+          `Ensure next.config.js has output: 'export'.`
+      )
+    }
+
+    onProgress('Serving Next.js static export...')
+    return serveDir(outPath)
+  } finally {
+    if (!alreadyExported) {
+      if (configPath && original !== null) {
+        fs.writeFileSync(configPath, original, 'utf-8')
+      } else {
+        const created = path.join(projectPath, 'next.config.js')
+        if (fs.existsSync(created)) fs.rmSync(created)
+      }
+    }
+  }
+}
+
+function readNextConfig(projectPath: string): {
+  configPath: string | null
+  original: string | null
+} {
+  for (const name of ['next.config.js', 'next.config.mjs', 'next.config.ts', 'next.config.cjs']) {
+    const fullPath = path.join(projectPath, name)
+    if (fs.existsSync(fullPath)) {
+      return { configPath: fullPath, original: fs.readFileSync(fullPath, 'utf-8') }
+    }
+  }
+  return { configPath: null, original: null }
 }
 
 async function serveDir(dirPath: string): Promise<BuildResult> {
