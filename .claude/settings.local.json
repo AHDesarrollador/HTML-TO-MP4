@@ -17,7 +17,9 @@
       "Bash(npx tsc *)",
       "Bash(npm test *)",
       "Bash(node *)",
-      "Bash(where ffmpeg *)"
+      "Bash(where ffmpeg *)",
+      "Bash(gh --version)",
+      "Skill(update-config)"
     ]
   }
 }
